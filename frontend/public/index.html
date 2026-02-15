@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LiveKit Interview Chat</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Interview Assistant</h1>
+      <div class="connection-status" id="status">Disconnected</div>
+    </header>
+
+    <div class="connect-form" id="connect-form">
+      <input type="text" id="livekit-url" placeholder="LiveKit URL (wss://...)" value="">
+      <input type="text" id="token" placeholder="Access Token">
+      <button id="connect-btn">Connect</button>
+    </div>
+
+    <main class="chat-container" id="chat-container">
+      <div class="messages" id="messages"></div>
+
+      <form class="input-area" id="input-form">
+        <input type="text" id="message-input" placeholder="Type your message..." disabled>
+        <button type="submit" id="send-btn" disabled>Send</button>
+      </form>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.9.1/dist/livekit-client.umd.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

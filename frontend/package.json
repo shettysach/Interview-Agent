@@ -1,0 +1,13 @@
+{
+  "name": "livekit-chat-frontend",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "bun run --hot index.ts"
+  },
+  "dependencies": {
+    "livekit-client": "^2.9.1"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.14"
+  }
+}

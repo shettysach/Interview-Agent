@@ -24,6 +24,8 @@
 
         livekit
         livekit-cli
+
+        bun
       ];
 
       shellHook = ''
