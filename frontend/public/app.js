@@ -83,12 +83,10 @@ async function connect() {
   room.registerTextStreamHandler("lk.transcription", async (reader, participantInfo) => {
     const message = await reader.readAll();
     const isFinal = reader.info.attributes["lk.transcription_final"] === "true";
-    const transcribedTrackId = reader.info.attributes["lk.transcribed_track_id"];
-    const segmentId = reader.info.attributes["lk.segment_id"];
     
     if (isFinal && message.trim()) {
-      const isAgent = participantInfo?.identity?.includes("agent") || !transcribedTrackId;
-      addMessage(message, !isAgent, participantInfo?.identity || (isAgent ? "Agent" : "You"));
+      const isUser = participantInfo?.identity === room.localParticipant?.identity;
+      addMessage(message, isUser, isUser ? "You" : "Agent");
     }
   });
 
@@ -100,7 +98,15 @@ async function connect() {
   try {
     await room.connect(url, token);
     setConnected(true);
-    addMessage("Connected to interview room", false, "System");
+    
+    // Auto-enable microphone for voice interview
+    micTrack = await createLocalAudioTrack({
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    });
+    await room.localParticipant.publishTrack(micTrack);
+    setMicState(true);
   } catch (err) {
     console.error("Connection failed:", err);
     alert(`Connection failed: ${err.message}`);
@@ -130,7 +136,6 @@ async function toggleMic() {
       micTrack = null;
     }
     setMicState(false);
-    addMessage("Microphone disabled", false, "System");
   } else {
     try {
       micTrack = await createLocalAudioTrack({
@@ -140,7 +145,6 @@ async function toggleMic() {
       });
       await room.localParticipant.publishTrack(micTrack);
       setMicState(true);
-      addMessage("Microphone enabled - speak now", false, "System");
     } catch (err) {
       console.error("Failed to enable microphone:", err);
       addMessage(`Mic error: ${err.message}`, false, "System");
