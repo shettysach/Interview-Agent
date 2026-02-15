@@ -39,7 +39,7 @@ from livekit.agents import (
     room_io,
 )
 from livekit.agents.llm import function_tool
-from livekit.plugins import google, deepgram
+from livekit.plugins import google, deepgram, silero
 
 logger = logging.getLogger("text-only-two-stage")
 
@@ -176,9 +176,10 @@ server.setup_fnc = prewarm
 @server.rtc_session()
 async def entrypoint(ctx: JobContext):
     session = AgentSession[InterviewData](
-        llm=google.LLM(model="gemini-2.5-flash"),
+        llm=google.LLM(model="gemini-2.5-flash-lite"),
         stt=deepgram.STT(),
         tts=deepgram.TTS(),
+        vad=silero.VAD.load(),
         userdata=InterviewData(),
     )
 

@@ -1,8 +1,9 @@
-const { Room, RoomEvent, createLocalAudioTrack } = LivekitClient;
+const { Room, RoomEvent, createLocalAudioTrack, Track } = LivekitClient;
 
 let room = null;
 let micTrack = null;
 let micEnabled = false;
+let audioElement = null;
 
 const statusEl = document.getElementById("status");
 const connectForm = document.getElementById("connect-form");
@@ -16,6 +17,12 @@ const sendBtn = document.getElementById("send-btn");
 const micBtn = document.getElementById("mic-btn");
 const micIcon = document.getElementById("mic-icon");
 const micOffIcon = document.getElementById("mic-off-icon");
+
+// Load saved URL from localStorage
+const savedUrl = localStorage.getItem("livekit-url");
+if (savedUrl) {
+  urlInput.value = savedUrl;
+}
 
 function addMessage(content, isUser = false, sender = null) {
   const div = document.createElement("div");
@@ -90,12 +97,30 @@ async function connect() {
     }
   });
 
+  // Play agent audio when track is subscribed
+  room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+    if (track.kind === Track.Kind.Audio) {
+      audioElement = track.attach();
+      document.body.appendChild(audioElement);
+      audioElement.play().catch(console.error);
+    }
+  });
+
+  room.on(RoomEvent.TrackUnsubscribed, (track) => {
+    if (track.kind === Track.Kind.Audio) {
+      track.detach().forEach(el => el.remove());
+    }
+  });
+
   room.on(RoomEvent.Disconnected, () => {
     setConnected(false);
     addMessage("Disconnected from room", false, "System");
   });
 
   try {
+    // Save URL for next time
+    localStorage.setItem("livekit-url", url);
+    
     await room.connect(url, token);
     setConnected(true);
     
@@ -168,12 +193,10 @@ inputForm.addEventListener("submit", async (e) => {
   const text = messageInput.value.trim();
   if (!text || !room) return;
 
-  const encoder = new TextEncoder();
-  const data = encoder.encode(JSON.stringify({ text }));
-
   try {
-    await room.localParticipant.publishData(data, { reliable: true });
-    addMessage(text, true);
+    // Send via lk.chat topic so agent receives it in context
+    await room.localParticipant.sendText(text, { topic: "lk.chat" });
+    addMessage(text, true, "You");
     messageInput.value = "";
   } catch (err) {
     console.error("Failed to send message:", err);
