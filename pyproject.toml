@@ -1,0 +1,11 @@
+[project]
+name = "takehome"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "dotenv>=0.9.9",
+    "livekit-agents[cartesia,deepgram,openai,silero,turn-detector]~=1.0",
+    "livekit-plugins-google>=1.4.1",
+]
