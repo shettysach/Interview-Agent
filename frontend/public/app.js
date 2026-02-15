@@ -1,6 +1,8 @@
-const { Room, RoomEvent, DataPacket_Kind } = LivekitClient;
+const { Room, RoomEvent, createLocalAudioTrack } = LivekitClient;
 
 let room = null;
+let micTrack = null;
+let micEnabled = false;
 
 const statusEl = document.getElementById("status");
 const connectForm = document.getElementById("connect-form");
@@ -11,6 +13,9 @@ const messagesEl = document.getElementById("messages");
 const inputForm = document.getElementById("input-form");
 const messageInput = document.getElementById("message-input");
 const sendBtn = document.getElementById("send-btn");
+const micBtn = document.getElementById("mic-btn");
+const micIcon = document.getElementById("mic-icon");
+const micOffIcon = document.getElementById("mic-off-icon");
 
 function addMessage(content, isUser = false, sender = null) {
   const div = document.createElement("div");
@@ -34,7 +39,19 @@ function setConnected(connected) {
   statusEl.classList.toggle("connected", connected);
   messageInput.disabled = !connected;
   sendBtn.disabled = !connected;
+  micBtn.disabled = !connected;
   connectBtn.textContent = connected ? "Disconnect" : "Connect";
+  
+  if (!connected) {
+    setMicState(false);
+  }
+}
+
+function setMicState(enabled) {
+  micEnabled = enabled;
+  micBtn.classList.toggle("active", enabled);
+  micIcon.style.display = enabled ? "none" : "block";
+  micOffIcon.style.display = enabled ? "block" : "none";
 }
 
 async function connect() {
@@ -63,6 +80,18 @@ async function connect() {
     }
   });
 
+  room.registerTextStreamHandler("lk.transcription", async (reader, participantInfo) => {
+    const message = await reader.readAll();
+    const isFinal = reader.info.attributes["lk.transcription_final"] === "true";
+    const transcribedTrackId = reader.info.attributes["lk.transcribed_track_id"];
+    const segmentId = reader.info.attributes["lk.segment_id"];
+    
+    if (isFinal && message.trim()) {
+      const isAgent = participantInfo?.identity?.includes("agent") || !transcribedTrackId;
+      addMessage(message, !isAgent, participantInfo?.identity || (isAgent ? "Agent" : "You"));
+    }
+  });
+
   room.on(RoomEvent.Disconnected, () => {
     setConnected(false);
     addMessage("Disconnected from room", false, "System");
@@ -80,11 +109,43 @@ async function connect() {
 }
 
 function disconnect() {
+  if (micTrack) {
+    micTrack.stop();
+    micTrack = null;
+  }
   if (room) {
     room.disconnect();
     room = null;
   }
   setConnected(false);
+}
+
+async function toggleMic() {
+  if (!room) return;
+
+  if (micEnabled) {
+    if (micTrack) {
+      await room.localParticipant.unpublishTrack(micTrack);
+      micTrack.stop();
+      micTrack = null;
+    }
+    setMicState(false);
+    addMessage("Microphone disabled", false, "System");
+  } else {
+    try {
+      micTrack = await createLocalAudioTrack({
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      });
+      await room.localParticipant.publishTrack(micTrack);
+      setMicState(true);
+      addMessage("Microphone enabled - speak now", false, "System");
+    } catch (err) {
+      console.error("Failed to enable microphone:", err);
+      addMessage(`Mic error: ${err.message}`, false, "System");
+    }
+  }
 }
 
 connectBtn.addEventListener("click", () => {
@@ -94,6 +155,8 @@ connectBtn.addEventListener("click", () => {
     connect();
   }
 });
+
+micBtn.addEventListener("click", toggleMic);
 
 inputForm.addEventListener("submit", async (e) => {
   e.preventDefault();

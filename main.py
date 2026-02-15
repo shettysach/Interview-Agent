@@ -36,9 +36,10 @@ from livekit.agents import (
     JobProcess,
     RunContext,
     cli,
+    room_io,
 )
 from livekit.agents.llm import function_tool
-from livekit.plugins import google
+from livekit.plugins import google, deepgram
 
 logger = logging.getLogger("text-only-two-stage")
 
@@ -174,15 +175,19 @@ server.setup_fnc = prewarm
 
 @server.rtc_session()
 async def entrypoint(ctx: JobContext):
-    # Text-only session: no vad/stt/tts.
     session = AgentSession[InterviewData](
         llm=google.LLM(model="gemini-2.5-flash"),
+        stt=deepgram.STT(),
+        tts=deepgram.TTS(),
         userdata=InterviewData(),
     )
 
     await session.start(
         agent=SelfIntroAgent(),
         room=ctx.room,
+        room_options=room_io.RoomOptions(
+            close_on_disconnect=False,
+        ),
     )
 
 

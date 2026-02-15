@@ -26,12 +26,23 @@
         livekit-cli
 
         bun
+
+        # VA-API for LiveKit media
+        libva
+      ];
+
+      LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
+        pkgs.libva
       ];
 
       shellHook = ''
         # Python environment
         unset PYTHONPATH
         export UV_PYTHON_DOWNLOADS=never
+        
+        # SSL certificates for Python
+        export SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt
+        export REQUESTS_CA_BUNDLE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt
       '';
     };
   };
