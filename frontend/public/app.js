@@ -4,6 +4,8 @@ let room = null;
 let micTrack = null;
 let micEnabled = false;
 let audioElement = null;
+let pendingUserText = "";
+let userMessageEl = null;
 
 const statusEl = document.getElementById("status");
 const connectForm = document.getElementById("connect-form");
@@ -93,7 +95,39 @@ async function connect() {
     
     if (isFinal && message.trim()) {
       const isUser = participantInfo?.identity === room.localParticipant?.identity;
-      addMessage(message, isUser, isUser ? "You" : "Agent");
+      
+      if (isUser) {
+        // Accumulate user speech into one message
+        pendingUserText += (pendingUserText ? " " : "") + message.trim();
+        
+        if (userMessageEl) {
+          // Update existing message
+          userMessageEl.querySelector("div:last-child").textContent = pendingUserText;
+        } else {
+          // Create new message element
+          userMessageEl = document.createElement("div");
+          userMessageEl.className = "message user";
+          
+          const senderDiv = document.createElement("div");
+          senderDiv.className = "sender";
+          senderDiv.textContent = "You";
+          
+          const textDiv = document.createElement("div");
+          textDiv.textContent = pendingUserText;
+          
+          userMessageEl.appendChild(senderDiv);
+          userMessageEl.appendChild(textDiv);
+          messagesEl.appendChild(userMessageEl);
+        }
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      } else {
+        // Agent message - finalize any pending user message
+        if (pendingUserText) {
+          pendingUserText = "";
+          userMessageEl = null;
+        }
+        addMessage(message, false, "Agent");
+      }
     }
   });
 
