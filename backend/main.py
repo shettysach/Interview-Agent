@@ -8,6 +8,7 @@ from typing import Optional
 
 from dotenv import load_dotenv
 
+from livekit import rtc
 from livekit.agents import (
     Agent,
     AgentServer,
@@ -40,6 +41,16 @@ class InterviewData:
 
     self_intro_deadline_at: float = 0.0
 
+    room: rtc.Room | None = None
+
+    async def broadcast_stage(self):
+        """Send stage update to all participants."""
+        if self.room and self.room.isconnected():
+            data = f'{{"stage": "{self.stage}"}}'.encode()
+            await self.room.local_participant.publish_data(
+                data, reliable=True, topic="stage"
+            )
+
 
 class SelfIntroAgent(Agent):
     def __init__(self) -> None:
@@ -59,6 +70,7 @@ class SelfIntroAgent(Agent):
         ud: InterviewData = self.session.userdata
         ud.stage = "self_intro"
         ud.self_intro_deadline_at = time.time() + SELF_INTRO_MAX_SECONDS
+        await ud.broadcast_stage()
 
         self._deadline_task = asyncio.create_task(self._deadline_fallback())
 
@@ -113,6 +125,7 @@ class SelfIntroAgent(Agent):
         ud.name = name or ud.name
         ud.current_role = current_role or ud.current_role
         ud.intro_summary = intro_summary or ud.intro_summary
+        await ud.broadcast_stage()
 
         logger.info("Handoff to PastExperienceAgent: %s", ud)
 
@@ -131,16 +144,60 @@ class PastExperienceAgent(Agent):
                 "Stage 2: Past experience.\n"
                 "Ask the user for one project/story. Then ask up to two follow-ups:\n"
                 "1) measurable impact, 2) a challenge/tradeoff.\n"
-                "Be concise and avoid repetition."
+                "Be concise and avoid repetition.\n"
+                "When you have gathered enough details about impact and challenges, "
+                "call the tool past_experience_complete."
             )
         )
+        self._followup_count = 0
 
     async def on_enter(self):
+        ud: InterviewData = self.session.userdata
+        ud.stage = "past_experience"
+        await ud.broadcast_stage()
+
         self.session.generate_reply(
             instructions=(
                 "Ask the user to describe a past project they significantly contributed to."
             )
         )
+
+    @function_tool
+    async def past_experience_complete(
+        self,
+        context: RunContext[InterviewData],
+        project_summary: Optional[str] = None,
+    ):
+        """
+        Handoff tool: call when Stage 2 is complete.
+        Returns (DoneAgent, closing_message).
+        """
+        ud: InterviewData = context.userdata
+        ud.stage = "done"
+        await ud.broadcast_stage()
+
+        logger.info("Interview complete: %s", ud)
+
+        return (
+            DoneAgent(),
+            "Thank you for sharing! That concludes our mock interview. "
+            "You did great discussing your background and project experience.",
+        )
+
+
+class DoneAgent(Agent):
+    def __init__(self) -> None:
+        super().__init__(
+            instructions=(
+                "The interview is complete. Thank the user and offer to answer "
+                "any questions they have about the interview process."
+            )
+        )
+
+    async def on_enter(self):
+        ud: InterviewData = self.session.userdata
+        ud.stage = "done"
+        await ud.broadcast_stage()
 
 
 server = AgentServer()
@@ -156,6 +213,8 @@ server.setup_fnc = prewarm
 
 @server.rtc_session()
 async def entrypoint(ctx: JobContext):
+    interview_data = InterviewData(room=ctx.room)
+
     session = AgentSession[InterviewData](
         llm=google.LLM(model="gemini-2.5-flash-lite"),
         stt=deepgram.STT(),
@@ -164,7 +223,7 @@ async def entrypoint(ctx: JobContext):
         turn_detection=EnglishModel(),
         min_endpointing_delay=1.0,
         max_endpointing_delay=6.0,
-        userdata=InterviewData(),
+        userdata=interview_data,
     )
 
     await session.start(

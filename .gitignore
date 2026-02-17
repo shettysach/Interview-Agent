@@ -7,12 +7,12 @@ wheels/
 *.egg-info
 
 # Virtual environments
-.venv
-.env
 .envrc
 .direnv/
 
-livekit.yaml
-token.txt
+backend/.venv
+backend/.env
+backend/livekit.yaml
+backend/token.txt
 
 frontend/node_modules/

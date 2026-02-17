@@ -1,8 +1,10 @@
-const { Room, RoomEvent, createLocalAudioTrack, Track } = LivekitClient;
+const { Room, RoomEvent, createLocalAudioTrack, createLocalVideoTrack, Track } = LivekitClient;
 
 let room = null;
 let micTrack = null;
+let videoTrack = null;
 let micEnabled = false;
+let cameraEnabled = false;
 let audioElement = null;
 let pendingUserText = "";
 let userMessageEl = null;
@@ -19,6 +21,12 @@ const sendBtn = document.getElementById("send-btn");
 const micBtn = document.getElementById("mic-btn");
 const micIcon = document.getElementById("mic-icon");
 const micOffIcon = document.getElementById("mic-off-icon");
+const stageIntro = document.getElementById("stage-intro");
+const stageExperience = document.getElementById("stage-experience");
+const stageDone = document.getElementById("stage-done");
+const cameraBtn = document.getElementById("camera-btn");
+const localVideo = document.getElementById("local-video");
+const videoPlaceholder = document.getElementById("video-placeholder");
 
 // Load saved URL from localStorage
 const savedUrl = localStorage.getItem("livekit-url");
@@ -49,10 +57,16 @@ function setConnected(connected) {
   messageInput.disabled = !connected;
   sendBtn.disabled = !connected;
   micBtn.disabled = !connected;
+  cameraBtn.disabled = !connected;
+  
+  // Hide/show connect form
+  urlInput.style.display = connected ? "none" : "block";
+  tokenInput.style.display = connected ? "none" : "block";
   connectBtn.textContent = connected ? "Disconnect" : "Connect";
   
   if (!connected) {
     setMicState(false);
+    setCameraState(false);
   }
 }
 
@@ -61,6 +75,31 @@ function setMicState(enabled) {
   micBtn.classList.toggle("active", enabled);
   micIcon.style.display = enabled ? "none" : "block";
   micOffIcon.style.display = enabled ? "block" : "none";
+}
+
+function setCameraState(enabled) {
+  cameraEnabled = enabled;
+  cameraBtn.classList.toggle("active", enabled);
+  localVideo.classList.toggle("active", enabled);
+  videoPlaceholder.classList.toggle("hidden", enabled);
+}
+
+function updateStage(stage) {
+  // Reset all stages
+  stageIntro.classList.remove("active", "completed");
+  stageExperience.classList.remove("active", "completed");
+  stageDone.classList.remove("active", "completed");
+
+  if (stage === "self_intro") {
+    stageIntro.classList.add("active");
+  } else if (stage === "past_experience") {
+    stageIntro.classList.add("completed");
+    stageExperience.classList.add("active");
+  } else if (stage === "done") {
+    stageIntro.classList.add("completed");
+    stageExperience.classList.add("completed");
+    stageDone.classList.add("active");
+  }
 }
 
 async function connect() {
@@ -77,6 +116,17 @@ async function connect() {
   room.on(RoomEvent.DataReceived, (payload, participant, kind, topic) => {
     const decoder = new TextDecoder();
     const text = decoder.decode(payload);
+    
+    // Handle stage updates
+    if (topic === "stage") {
+      try {
+        const data = JSON.parse(text);
+        if (data.stage) {
+          updateStage(data.stage);
+        }
+      } catch {}
+      return;
+    }
     
     try {
       const data = JSON.parse(text);
@@ -178,11 +228,42 @@ function disconnect() {
     micTrack.stop();
     micTrack = null;
   }
+  if (videoTrack) {
+    videoTrack.stop();
+    videoTrack = null;
+  }
   if (room) {
     room.disconnect();
     room = null;
   }
   setConnected(false);
+}
+
+async function toggleCamera() {
+  if (!room) return;
+
+  if (cameraEnabled) {
+    if (videoTrack) {
+      await room.localParticipant.unpublishTrack(videoTrack);
+      videoTrack.stop();
+      videoTrack = null;
+    }
+    localVideo.srcObject = null;
+    setCameraState(false);
+  } else {
+    try {
+      videoTrack = await createLocalVideoTrack({
+        facingMode: "user",
+        resolution: { width: 640, height: 480 },
+      });
+      await room.localParticipant.publishTrack(videoTrack);
+      localVideo.srcObject = new MediaStream([videoTrack.mediaStreamTrack]);
+      setCameraState(true);
+    } catch (err) {
+      console.error("Failed to enable camera:", err);
+      addMessage(`Camera error: ${err.message}`, false, "System");
+    }
+  }
 }
 
 async function toggleMic() {
@@ -220,6 +301,7 @@ connectBtn.addEventListener("click", () => {
 });
 
 micBtn.addEventListener("click", toggleMic);
+cameraBtn.addEventListener("click", toggleCamera);
 
 inputForm.addEventListener("submit", async (e) => {
   e.preventDefault();

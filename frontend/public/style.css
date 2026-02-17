@@ -12,7 +12,7 @@ body {
 }
 
 .container {
-  max-width: 800px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 20px;
   display: flex;
@@ -24,7 +24,7 @@ header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-bottom: 20px;
+  padding-bottom: 16px;
   border-bottom: 1px solid #333;
 }
 
@@ -48,46 +48,184 @@ header h1 {
 .connect-form {
   display: flex;
   gap: 10px;
-  padding: 20px 0;
+  padding: 16px 0;
   flex-wrap: wrap;
 }
 
 .connect-form input {
   flex: 1;
   min-width: 200px;
-  padding: 12px;
+  padding: 10px 12px;
   border: 1px solid #333;
   border-radius: 8px;
   background: #141414;
   color: #fff;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
 }
 
 .connect-form input::placeholder {
   color: #666;
 }
 
-.connect-form button,
-#send-btn {
-  padding: 12px 24px;
+.connect-form button {
+  padding: 10px 20px;
   border: 1px solid #333;
   border-radius: 8px;
   background: #1a1a1a;
   color: #fff;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   cursor: pointer;
   transition: background 0.2s;
 }
 
-.connect-form button:hover,
-#send-btn:hover:not(:disabled) {
+.connect-form button:hover {
   background: #2a2a2a;
 }
 
-#send-btn:disabled {
+.stage-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 0;
+  gap: 8px;
+  border-bottom: 1px solid #222;
+}
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  opacity: 0.4;
+  transition: opacity 0.3s;
+}
+
+.stage.active {
+  opacity: 1;
+}
+
+.stage.completed {
+  opacity: 0.7;
+}
+
+.stage-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #333;
+  border: 2px solid #555;
+  transition: all 0.3s;
+}
+
+.stage.active .stage-dot {
+  background: #fff;
+  border-color: #fff;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+.stage.completed .stage-dot {
+  background: #22c55e;
+  border-color: #22c55e;
+}
+
+.stage span {
+  font-size: 0.7rem;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.stage.active span {
+  color: #fff;
+}
+
+.stage-line {
+  width: 40px;
+  height: 2px;
+  background: #333;
+  margin-bottom: 20px;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  gap: 20px;
+  padding-top: 16px;
+  overflow: hidden;
+}
+
+.video-section {
+  width: 300px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.video-container {
+  aspect-ratio: 4/3;
   background: #111;
-  color: #444;
+  border-radius: 12px;
+  border: 1px solid #222;
+  overflow: hidden;
+  position: relative;
+}
+
+.video-container video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: none;
+}
+
+.video-container video.active {
+  display: block;
+}
+
+.video-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #555;
+}
+
+.video-placeholder.hidden {
+  display: none;
+}
+
+.camera-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #333;
+  border-radius: 8px;
+  background: #1a1a1a;
+  color: #888;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.camera-btn:hover:not(:disabled) {
+  background: #2a2a2a;
+  color: #fff;
+}
+
+.camera-btn:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
+}
+
+.camera-btn.active {
+  background: #fff;
+  color: #000;
+  border-color: #fff;
 }
 
 .chat-container {
@@ -95,24 +233,23 @@ header h1 {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  margin-top: 20px;
 }
 
 .messages {
   flex: 1;
   overflow-y: auto;
-  padding: 20px;
+  padding: 16px;
   background: #111;
   border-radius: 12px;
   border: 1px solid #222;
-  margin-bottom: 15px;
+  margin-bottom: 12px;
 }
 
 .message {
-  max-width: 80%;
-  padding: 12px 16px;
+  max-width: 85%;
+  padding: 10px 14px;
   border-radius: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
   line-height: 1.5;
   word-wrap: break-word;
 }
@@ -132,7 +269,7 @@ header h1 {
 }
 
 .message .sender {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: #666;
   margin-bottom: 4px;
 }
@@ -148,8 +285,8 @@ header h1 {
 }
 
 .mic-btn {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   border: 1px solid #333;
   border-radius: 50%;
   background: #1a1a1a;
@@ -181,17 +318,17 @@ header h1 {
 
 @keyframes pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.3); }
-  50% { box-shadow: 0 0 0 10px rgba(255, 255, 255, 0); }
+  50% { box-shadow: 0 0 0 8px rgba(255, 255, 255, 0); }
 }
 
 .input-area input {
   flex: 1;
-  padding: 14px;
+  padding: 12px;
   border: 1px solid #333;
   border-radius: 8px;
   background: #141414;
   color: #fff;
-  font-size: 1rem;
+  font-size: 0.95rem;
 }
 
 .input-area input::placeholder {
@@ -200,6 +337,27 @@ header h1 {
 
 .input-area input:disabled {
   background: #0a0a0a;
+  cursor: not-allowed;
+}
+
+#send-btn {
+  padding: 12px 20px;
+  border: 1px solid #333;
+  border-radius: 8px;
+  background: #1a1a1a;
+  color: #fff;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+#send-btn:hover:not(:disabled) {
+  background: #2a2a2a;
+}
+
+#send-btn:disabled {
+  background: #111;
+  color: #444;
   cursor: not-allowed;
 }
 
@@ -214,4 +372,18 @@ header h1 {
 .messages::-webkit-scrollbar-thumb {
   background: #333;
   border-radius: 3px;
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    flex-direction: column;
+  }
+  
+  .video-section {
+    width: 100%;
+  }
+  
+  .video-container {
+    aspect-ratio: 16/9;
+  }
 }
