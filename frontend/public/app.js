@@ -8,6 +8,11 @@ let cameraEnabled = false;
 let audioElement = null;
 let pendingUserText = "";
 let userMessageEl = null;
+let agentMessageEl = null;
+let agentSegments = new Map(); // Track agent message segments by ID
+let transcript = []; // Store all messages for transcript
+let currentStage = "self_intro";
+let transcriptSaved = false;
 
 const statusEl = document.getElementById("status");
 const connectForm = document.getElementById("connect-form");
@@ -27,6 +32,7 @@ const stageDone = document.getElementById("stage-done");
 const cameraBtn = document.getElementById("camera-btn");
 const localVideo = document.getElementById("local-video");
 const videoPlaceholder = document.getElementById("video-placeholder");
+
 
 // Load saved URL from localStorage
 const savedUrl = localStorage.getItem("livekit-url");
@@ -85,6 +91,8 @@ function setCameraState(enabled) {
 }
 
 function updateStage(stage) {
+  currentStage = stage;
+  
   // Reset all stages
   stageIntro.classList.remove("active", "completed");
   stageExperience.classList.remove("active", "completed");
@@ -99,7 +107,85 @@ function updateStage(stage) {
     stageIntro.classList.add("completed");
     stageExperience.classList.add("completed");
     stageDone.classList.add("active");
+    
+    // Auto-save transcript once after a short delay
+    if (!transcriptSaved) {
+      transcriptSaved = true;
+      setTimeout(() => {
+        saveTranscript();
+      }, 2000);
+    }
   }
+}
+
+function generateTranscript() {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString();
+  const timeStr = now.toLocaleTimeString();
+  
+  let md = `# Interview Transcript\n\n`;
+  md += `**Date:** ${dateStr} at ${timeStr}\n\n`;
+  md += `---\n\n`;
+  
+  // Group by stage
+  const stages = {
+    self_intro: { title: "Self Introduction", messages: [] },
+    past_experience: { title: "Past Experience", messages: [] },
+    done: { title: "Closing", messages: [] }
+  };
+  
+  transcript.forEach(msg => {
+    if (stages[msg.stage]) {
+      stages[msg.stage].messages.push(msg);
+    }
+  });
+  
+  // Write each stage
+  for (const [key, stage] of Object.entries(stages)) {
+    if (stage.messages.length > 0) {
+      md += `## ${stage.title}\n\n`;
+      stage.messages.forEach(msg => {
+        const prefix = msg.isUser ? "**You:**" : "**Interviewer:**";
+        md += `${prefix} ${msg.text}\n\n`;
+      });
+    }
+  }
+  
+  // Generate summary
+  md += `---\n\n`;
+  md += `## Summary\n\n`;
+  
+  const userMessages = transcript.filter(m => m.isUser);
+  const introMessages = userMessages.filter(m => m.stage === "self_intro");
+  const expMessages = userMessages.filter(m => m.stage === "past_experience");
+  
+  md += `### Key Points\n\n`;
+  
+  if (introMessages.length > 0) {
+    md += `- **Introduction:** ${introMessages.map(m => m.text).join(" ").slice(0, 200)}...\n`;
+  }
+  
+  if (expMessages.length > 0) {
+    md += `- **Experience Discussed:** ${expMessages.map(m => m.text).join(" ").slice(0, 200)}...\n`;
+  }
+  
+  md += `\n### Statistics\n\n`;
+  md += `- Total exchanges: ${transcript.length}\n`;
+  md += `- Your responses: ${userMessages.length}\n`;
+  md += `- Interviewer questions: ${transcript.filter(m => !m.isUser).length}\n`;
+  
+  return md;
+}
+
+function saveTranscript() {
+  const md = generateTranscript();
+  const blob = new Blob([md], { type: "text/markdown" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `interview-transcript-${Date.now()}.md`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 async function connect() {
@@ -140,21 +226,19 @@ async function connect() {
   });
 
   room.registerTextStreamHandler("lk.transcription", async (reader, participantInfo) => {
-    const message = await reader.readAll();
+    const segmentId = reader.info.attributes["lk.segment_id"];
     const isFinal = reader.info.attributes["lk.transcription_final"] === "true";
+    const isUser = participantInfo?.identity === room.localParticipant?.identity;
     
-    if (isFinal && message.trim()) {
-      const isUser = participantInfo?.identity === room.localParticipant?.identity;
-      
-      if (isUser) {
-        // Accumulate user speech into one message
+    if (isUser) {
+      // User transcription - wait for final
+      const message = await reader.readAll();
+      if (isFinal && message.trim()) {
         pendingUserText += (pendingUserText ? " " : "") + message.trim();
         
         if (userMessageEl) {
-          // Update existing message
           userMessageEl.querySelector("div:last-child").textContent = pendingUserText;
         } else {
-          // Create new message element
           userMessageEl = document.createElement("div");
           userMessageEl.className = "message user";
           
@@ -170,13 +254,69 @@ async function connect() {
           messagesEl.appendChild(userMessageEl);
         }
         messagesEl.scrollTop = messagesEl.scrollHeight;
-      } else {
-        // Agent message - finalize any pending user message
-        if (pendingUserText) {
-          pendingUserText = "";
-          userMessageEl = null;
+        
+        // Add to transcript
+        transcript.push({ isUser: true, text: message.trim(), stage: currentStage, time: new Date() });
+      }
+    } else {
+      // Agent transcription - stream it
+      // Finalize user message when agent starts speaking
+      if (pendingUserText) {
+        pendingUserText = "";
+        userMessageEl = null;
+      }
+      
+      const segmentId = reader.info.attributes["lk.segment_id"];
+      
+      // Get or create message element for this segment
+      let msgEl = segmentId ? document.querySelector(`[data-segment="${segmentId}"]`) : null;
+      
+      if (!msgEl) {
+        msgEl = document.createElement("div");
+        msgEl.className = "message agent";
+        if (segmentId) msgEl.dataset.segment = segmentId;
+        
+        const senderDiv = document.createElement("div");
+        senderDiv.className = "sender";
+        senderDiv.textContent = "Agent";
+        
+        const textDiv = document.createElement("div");
+        textDiv.className = "agent-text";
+        textDiv.textContent = "";
+        
+        msgEl.appendChild(senderDiv);
+        msgEl.appendChild(textDiv);
+        messagesEl.appendChild(msgEl);
+      }
+      
+      // Stream the text incrementally
+      const textDiv = msgEl.querySelector(".agent-text");
+      let fullText = "";
+      
+      try {
+        for await (const chunk of reader) {
+          if (chunk && chunk.collected) {
+            fullText = chunk.collected;
+          } else if (typeof chunk === "string") {
+            fullText += chunk;
+          }
+          
+          textDiv.textContent = fullText;
+          messagesEl.scrollTop = messagesEl.scrollHeight;
         }
-        addMessage(message, false, "Agent");
+      } catch (e) {
+        console.error("Error reading stream:", e);
+      }
+      
+      // Add to transcript when we have text (final or last chunk)
+      if (fullText.trim()) {
+        // Check if this segment already exists in transcript
+        const existingIdx = transcript.findIndex(t => t.segmentId === segmentId && !t.isUser);
+        if (existingIdx >= 0) {
+          transcript[existingIdx].text = fullText.trim();
+        } else {
+          transcript.push({ isUser: false, text: fullText.trim(), stage: currentStage, time: new Date(), segmentId });
+        }
       }
     }
   });

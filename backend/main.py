@@ -231,6 +231,9 @@ async def entrypoint(ctx: JobContext):
         room=ctx.room,
         room_options=room_io.RoomOptions(
             close_on_disconnect=False,
+            text_output=room_io.TextOutputOptions(
+                sync_transcription=False,
+            ),
         ),
     )
 
