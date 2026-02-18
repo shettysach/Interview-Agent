@@ -2,7 +2,7 @@
 
 ## Architecture Overview
 
-![[arch.png]]
+![arch.png](./arch.png)
 
 ---
 
@@ -378,4 +378,4 @@ Required in `backend/.env`:
 
 ### Voice Input Path
 
-![[pipeline.png]]
+![pipeline.png](pipeline.png)
